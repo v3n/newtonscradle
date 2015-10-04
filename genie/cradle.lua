@@ -9,7 +9,8 @@ project ( _name )
     includedirs 
     {
         CRADLE_DIR .. "src/",
-        BGFX_DIR .. "examples/common"
+        BGFX_DIR .. "examples/common",
+        BGFX_DIR .. "3rdparty"
     }
 
     defines
