@@ -106,6 +106,10 @@ int _main_(int /* argc */, char** /* *argv[] */)
     bgfx::UniformHandle u_time = bgfx::createUniform("u_time", bgfx::UniformType::Vec4);
     float time = 0.0f;
 
+    bx::mtxTranslate((float *)&mtx, -(n_worlds / float(2)), 0.0f, 0.0f);
+    Matrix4 move;
+    bx::mtxTranslate((float *)&move, 1.0f, 0.0f, 0.0f);
+
     while ( !entry::processEvents(width, height, debug, reset, &mouseState) )
     {
         if (++_frame_count > 119) _frame_count = 0;
@@ -167,9 +171,6 @@ int _main_(int /* argc */, char** /* *argv[] */)
 
         bgfx::setUniform(u_time, &time);
 
-        bx::mtxTranslate((float *)&mtx, -(n_worlds / float(2)), 0.0f, 0.0f);
-        Matrix4 move;
-        bx::mtxTranslate((float *)&move, 1.0f, 0.0f, 0.0f);
         Matrix4 _mtx = mtx;
         for ( size_t i = 0; i < n_worlds; i++ )
         {
