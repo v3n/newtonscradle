@@ -21,7 +21,7 @@ endif
 GENIE=ext/bx/tools/bin/$(OS)/genie
 
 osx-build:
-	$(GENIE) --file=genie/genie.lua --compiler=osx gmake
+	$(GENIE) --file=genie/genie.lua --compiler=osx --with-tools gmake
 osx-debug:
 	make -R -C build/projects/osx config=debug64
 osx-development:
