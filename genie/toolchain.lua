@@ -88,7 +88,8 @@ function toolchain(build_dir, lib_dir)
     configuration { "gmake" }
         buildoptions
         {
-            -- "-m64"
+            -- "-m64",
+            "-std=c++11"
         }
 
     configuration { "development or release" }
