@@ -55,13 +55,28 @@ inline bool operator==(const Vector3& v1, const Vector3& v2)
 inline Vector3 operator+=(Vector3& v1, const Vector3& v2)
 {
     v1.x += v2.x;
-    v1.y += v1.y;
+    v1.y += v2.y;
     v1.z += v2.z;
 
     return v1;
 }
 
 inline Vector3 operator+(Vector3 v1, const Vector3& v2)
+{
+    v1 += v2;
+    return v1;
+}
+
+inline Vector3 operator+=(Vector3& v1, const float f)
+{
+    v1.x += f;
+    v1.y += f;
+    v1.z += f;
+
+    return v1;
+}
+
+inline Vector3 operator+(Vector3 v1, const float f)
 {
     v1 += v2;
     return v1;
@@ -81,6 +96,22 @@ inline Vector3 operator-(Vector3 v1, const Vector3& v2)
     v1 -= v2;
     return v1;
 }
+
+inline Vector3 operator-=(Vector3& v1, const float f)
+{
+    v1.x -= f;
+    v1.y -= f;
+    v1.z -= f;
+
+    return v1;
+}
+
+inline Vector3 operator-(Vector3 v1, const float f)
+{
+    v1 -= v2;
+    return v1;
+}
+
 
 /** dot product @todo: remove this operator */
 inline float operator*(const Vector3& v1, const Vector3& v2)
