@@ -26,9 +26,9 @@ struct BoundingSphere
         return distance_sq <= (min_dist_sq * min_dist_sq);
     }
 
-    inline void update(Vector3& v)
+    inline void update(Vector3& vel)
     {
-        origin += v; 
+        origin += vel; 
     }
 };
 
@@ -55,8 +55,14 @@ struct PhysicsBody
     Vector3 velocity;
     Vector3 acceleration;
     Vector3 impulse;
+    Vector3 positionImpulse;
 
-    inline PhysicsBody init_body(   Vector3& pos,
+    Vector3 constraintLoc;
+    float   constraintLen;
+
+    size_t total_contacts;
+
+    inline void init_body(   Vector3& pos,
                                     float _mass, 
                                     float angle, 
                                     float radius,
@@ -65,10 +71,16 @@ struct PhysicsBody
     {
         position     = pos;
         lastPosition = pos;
-        
+
+        constraintLoc = pos;
+        constraintLen = length;
+
         collision.origin = pos;
         collision.origin.y -= length;
         collision.radius = radius;
+
+        position     = 
+        lastPosition = collision.origin;
 
         mass         = _mass;
 
@@ -81,6 +93,9 @@ struct PhysicsBody
         velocity     = vector3::vector3( 0.0f, 0.0f, 0.0f );
         acceleration = vector3::vector3( 0.0f, 0.0f, 0.0f );
         impulse      = vector3::vector3( 0.0f, 0.0f, 0.0f );
+        positionImpulse = vector3::vector3( 0.0f, 0.0f, 0.0f );
+
+        total_contacts = 0;
     }
 
     inline void applyGravity()
