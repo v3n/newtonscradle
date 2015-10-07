@@ -21,7 +21,27 @@ namespace altertum
 /* constructors */
 namespace vector3
 {
+    inline Vector3 vector3(Vector2 v)
+    {
+        Vector3 tmp;
 
+        tmp.x = v.x;
+        tmp.y = v.y;
+        tmp.z = 0.0f;
+
+        return tmp;
+    }
+
+    inline Vector3 vector3(float x, float y, float z)
+    {
+        Vector3 tmp;
+
+        tmp.x = x;
+        tmp.y = y;
+        tmp.z = z;
+
+        return tmp;
+    }
 }; // namespace vector3
 
 /** Returns result of comparison of vectors @a v1 and @a v2. */
