@@ -56,6 +56,21 @@ inline float operator*(const Vector3& v1, const Vector3& v2)
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
 }
 
+inline Vector3 operator*=(Vector3& v, const float f)
+{
+    v.x *= f;
+    v.y *= f;
+    v.z *= f;
+
+    return v;
+}
+
+inline Vector3 operator*(Vector3 v, const float f)
+{
+    v *= f;
+    return v;
+}
+
 /** scalar division */
 inline Vector3 operator/=(Vector3& v1, const float f)
 {
