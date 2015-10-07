@@ -15,11 +15,14 @@ static const float g_restingThreshold = 4.0f;
 static const float g_positionWarming = 0.8f;
 static const float g_positionDampen = 0.9f;
 static const float g_frictionNormalMult = 5.0f;
+static const size_t g_positionIterations = 6;
+static const size_t g_velocityIterations = 4;
 
 struct Collision
 {
     float penetration;
     Vector3 normal;
+    Vector3 tangent;
 };
 
 struct CollisionPair
@@ -31,13 +34,11 @@ struct CollisionPair
     float seperation;
     Vector3 normal;
 
-    static const float slop = 0.05f;
+    static constexpr float slop = 0.05f;
 };
 
-inline void solve_positions(std::vector<CollisionPair>& pairs)
+inline void presolve_positions(std::vector<CollisionPair>& pairs)
 {
-    Vector3 tempA, tempB, tempC, tempD;
-
     for ( size_t i = 0; i < pairs.size(); i++ )
     {
         PhysicsBody * BodyA = pairs[i].bodyA;
@@ -46,6 +47,11 @@ inline void solve_positions(std::vector<CollisionPair>& pairs)
         BodyA->total_contacts++;
         BodyB->total_contacts++;
     }
+}
+
+inline void solve_positions(std::vector<CollisionPair>& pairs)
+{
+    Vector3 tempA, tempB, tempC, tempD;
 
     for ( size_t i = 0; i < pairs.size(); i++ )
     {
@@ -77,7 +83,7 @@ inline void solve_positions(std::vector<CollisionPair>& pairs)
     } 
 }
 
-inline void post_solve_positions(std::vector<PhysicsBody>& bodies)
+inline void postsolve_positions(std::vector<PhysicsBody>& bodies)
 {
     for ( size_t i = 0; i < bodies.size(); i++ )
     {
@@ -101,8 +107,31 @@ inline void post_solve_positions(std::vector<PhysicsBody>& bodies)
     }
 }
 
-inline void solve_velocities(std::vector<CollisionPair> pairs)
+inline void presolve_velocities(std::vector<CollisionPair>& pairs)
 {
+    for ( size_t i = 0; i < pairs.size(); i++ )
+    {
+        CollisionPair & pair = pairs[i];
+        Collision & collision = pair.collision;
+        PhysicsBody * BodyA = pair.bodyA;
+        PhysicsBody * BodyB = pair.bodyB;
+    }
+}
 
+inline void solve_velocities(std::vector<CollisionPair>& pairs)
+{
+    for ( size_t i = 0; i < pairs.size(); i++ )
+    {
+        PhysicsBody * bodyA = pairs[i].bodyA;
+        PhysicsBody * bodyB = pairs[i].bodyB;
+
+        bodyA->velocity = bodyA->position - bodyA->lastPosition;
+        bodyB->velocity = bodyB->position - bodyB->lastPosition;
+
+        bodyA->angularVelocity = bodyA->angle - bodyA->lastAngle;
+        bodyB->angularVelocity = bodyB->angle - bodyB->lastAngle;
+
+        // for ( size_t j = 0; j < pair)
+    }
 }
 
