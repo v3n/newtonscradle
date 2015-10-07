@@ -67,6 +67,7 @@ struct PhysicsBody
         lastPosition = pos;
         
         collision.origin = pos;
+        collision.origin.y -= length;
         collision.radius = radius;
 
         mass         = _mass;
