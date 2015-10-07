@@ -57,27 +57,73 @@ static bool is_running = false;
 static char * run_text[4] = {"Running\0\0\0", "Running.\0\0", "Running..\0", "Running..."}; 
 static double frametime;
 
-Matrix4 * worlds;
+// Matrix4 * worlds;
 size_t n_worlds = 5;
 
 std::vector<PhysicsBody> bodies;
+std::vector<CollisionPair> pairs;
 
-// void create_bodies(size_t n_bodies)
-// {
-//     bodies = vector<PhysicsBody>(n_bodies);
-//     Vector3 pos;
+void create_bodies(size_t n_bodies)
+{
+    bodies = std::vector<PhysicsBody>(n_bodies);
 
-//     for ( size_t i = 0; i < n_bodies; i++ )
-//     {
-//         pos.x.x = (float)i;
-//         bodies[i].init_body(    pos,
-//                                 100.0f, 
-//                                 0.0f, 
-//                                 1.0f,
-//                                 2.25f,
-//                             );
-//     }
-// }
+    n_worlds = n_bodies;
+
+    for ( size_t i = 0; i < n_bodies; i++ )
+    {
+        Vector3 adjust = vector3::vector3(1.0f * i, 0.0f, 0.0f);
+        bodies[i].init_body(adjust,
+                            10.0f, 
+                            0.0f, 
+                            0.4f,
+                            2.25f
+                        );
+    }
+
+    for ( size_t i = 0; i < n_bodies; i++ )
+    {
+        CollisionPair p;
+        if ( i < n_bodies - 1 )
+        {
+            p.bodyA = &bodies[i];
+            p.bodyB = &bodies[i + 1];
+
+            pairs.push_back(p);
+        }
+    }
+}
+
+int32_t left_used;
+bool   use_left;
+
+int32_t right_used;
+bool   use_right;
+
+float starting_degree = 30.0f;
+
+void update_starting_degrees()
+{
+    if ( is_running ) return;
+    for ( std::vector<PhysicsBody>::iterator i = bodies.begin(); i != bodies.end(); i++ )
+    {
+        (*i).angle = 0.0f;
+    }
+    if ( use_left )
+    {
+        for ( std::vector<PhysicsBody>::iterator i = bodies.begin(); i != bodies.begin() + left_used; i++ )
+        {
+            (*i).angle = starting_degree;
+        }
+    }
+    if ( use_right )
+    {
+
+        for ( std::vector<PhysicsBody>::iterator i = bodies.end() - 1; i != bodies.end() - 1 - right_used; i-- )
+        {
+            (*i).angle = -starting_degree;
+        }
+    }
+}
 
 int _main_(int /* argc */, char** /* *argv[] */)
 {
@@ -196,10 +242,13 @@ int _main_(int /* argc */, char** /* *argv[] */)
 
     bx::mtxTranslate((float *)&mtx, -(n_worlds / float(2)), 0.0f, 0.0f);
     Matrix4 move;
-    bx::mtxTranslate((float *)&move, 0.8f, 0.0f, 0.0f);
+    bx::mtxTranslate((float *)&move, 1.0f, 0.0f, 0.0f);
 
     float deg = 0.0f;
     float time = 0.0f;
+    float lastTime = 0.0f;
+
+    create_bodies(n_worlds);
 
     while ( !entry::processEvents(width, height, debug, reset, &mouseState) )
     {
@@ -212,6 +261,7 @@ int _main_(int /* argc */, char** /* *argv[] */)
         last = now;
         const double freq = double(bx::getHPFrequency() );
         const double toMs = 1000.0/freq;
+        const double toS  = 10.0 / freq;
 
         /* begin imgui frame */
         imguiBeginFrame(mouseState.m_mx
@@ -228,19 +278,55 @@ int _main_(int /* argc */, char** /* *argv[] */)
         static int32_t rightScrollArea = 0;
         imguiBeginScrollArea("Settings", width - 256 - 10, 10, 256, 540, &rightScrollArea);
 
-        imguiInput("Simulation Duration:", duration_text, 5, true, ImguiAlign::Left, 
-                ImGuiInputTextFlags_CharsDecimal | 
-                ImGuiInputTextFlags_AutoSelectAll |
-                ImGuiInputTextFlags_CharsNoBlank);
+        // imguiInput("Simulation Duration:", duration_text, 5, true, ImguiAlign::Left, 
+        //         ImGuiInputTextFlags_CharsDecimal | 
+        //         ImGuiInputTextFlags_AutoSelectAll |
+        //         ImGuiInputTextFlags_CharsNoBlank);
         // {
         //     duration = atof(duration_text);
         // }
-        imguiSlider("# of Spheres", balls, 5, 11, true, ImguiAlign::LeftIndented);
+        imguiSlider("# of Spheres", balls, 5, 9, true, ImguiAlign::LeftIndented);
+        if ( !is_running && balls != n_worlds )
+        {
+            create_bodies( balls );
+            bx::mtxTranslate((float *)&mtx, -(n_worlds / float(2)), 0.0f, 0.0f);
+        }
+        if ( imguiSlider("Starting Degrees:", starting_degree, 30.0f, 80.0f, true) )
+        {
+            update_starting_degrees();
+        }
 
-        if ( imguiButton(is_running ? run_text[_frame_count / 30] : "Run", !is_running) )
+        imguiSeparatorLine();
+
+        imguiLabel( "Left Balls:" );
+        if ( imguiCheck( "Left", use_left, true ) )
+        {
+            use_left = !use_left;
+        }
+        if ( imguiSlider( "Left Side:", left_used, 1, n_worlds, true, ImguiAlign::LeftIndented ) )
+        {
+            update_starting_degrees();
+        }
+
+        imguiSeparatorLine();
+
+        imguiLabel( "Right Balls:" );
+        if ( imguiCheck( "Right", use_right, true ) )
+        {
+            use_right = !use_right;
+        }
+        if ( imguiSlider( "Right Side:", right_used, 1, n_worlds, true, ImguiAlign::LeftIndented ) )
+        {
+            update_starting_degrees();
+        }
+
+        imguiSeparatorLine();
+
+        if ( imguiButton(is_running ? run_text[_frame_count / 30] : "Run", true ) )
         {
             _frame_count = 0;
             is_running = !is_running;
+            update_starting_degrees();
         }
 
         /* submit imgui */
@@ -261,7 +347,7 @@ int _main_(int /* argc */, char** /* *argv[] */)
         /* submit uniforms */
         s_uniforms.submitPerFrameUniforms();
 
-        time += (float)(frameTime*settings.m_speed/freq);
+        time = double(frameTime) * toS;
         s_uniforms.m_camPosTime[3] = time;
 
         {
@@ -310,6 +396,7 @@ int _main_(int /* argc */, char** /* *argv[] */)
         bgfx::dbgTextPrintf(0, 1, 0x4f, "Cradle");
         bgfx::dbgTextPrintf(0, 2, 0x6f, "Newton's Cradle simulation.");
         bgfx::dbgTextPrintf(0, 3, 0x0f, "Frame: % 7.3f[ms]", double(frameTime)*toMs );
+        bgfx::dbgTextPrintf(0, 4, 0x0f, "Time: % 7.3f[s]", double(frameTime) * toS );
 
         Matrix4 _mtx = mtx;
         _mtx.a.x = 1.0f;
@@ -317,12 +404,24 @@ int _main_(int /* argc */, char** /* *argv[] */)
         _mtx.c.z = 1.0f;
         _mtx.d.w = 1.0f;
 
+        if ( is_running )
+        {
+            for ( size_t i = 0; i < bodies.size(); i++ )
+            {
+                bodies[i].solve_constraint();
+                bodies[i].applyGravity();
+                bodies[i].update(time * toS, time / lastTime);
+                bodies[i].postsolve_constraint();
+                bodies[i].clearForces();
+            }
+        }
+
         Matrix4 rot;
         for ( size_t i = 0; i < n_worlds; i++ )
         {
             _mtx *= move;
 
-            bx::mtxRotateZ((float *)&rot, deg);
+            bx::mtxRotateZ((float *)&rot, ( bodies[i].angle * M_PI) / 180 );
 
             Matrix4 s_mtx = _mtx;
             s_mtx *= rot;
@@ -334,6 +433,8 @@ int _main_(int /* argc */, char** /* *argv[] */)
 
         /* advance to next frame (uses seperate thread) */
         bgfx::frame();
+
+        lastTime = time;
     }
 
     meshUnload(mesh);
