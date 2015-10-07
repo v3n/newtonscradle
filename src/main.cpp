@@ -3,6 +3,8 @@
  */
 
 #include <chrono>
+#include <vector>
+
 #include <bgfx/bgfx.h>
 
 #include <bx/readerwriter.h>
@@ -15,7 +17,12 @@
 #include "bx/timer.h"
 #include "imgui/imgui.h"
 
+#include "physics/entity.h"
+#include "physics/resolver.h"
+
 #include "math/matrix4.h"
+
+#include "render.h"
 
 using namespace altertum;
 
@@ -53,6 +60,25 @@ static double frametime;
 Matrix4 * worlds;
 size_t n_worlds = 5;
 
+std::vector<PhysicsBody> bodies;
+
+// void create_bodies(size_t n_bodies)
+// {
+//     bodies = vector<PhysicsBody>(n_bodies);
+//     Vector3 pos;
+
+//     for ( size_t i = 0; i < n_bodies; i++ )
+//     {
+//         pos.x.x = (float)i;
+//         bodies[i].init_body(    pos,
+//                                 100.0f, 
+//                                 0.0f, 
+//                                 1.0f,
+//                                 2.25f,
+//                             );
+//     }
+// }
+
 int _main_(int /* argc */, char** /* *argv[] */)
 {
     /* windowing variables */
@@ -78,6 +104,67 @@ int _main_(int /* argc */, char** /* *argv[] */)
     /* initialize imgui */
     imguiCreate();
 
+    s_uniforms.init();
+
+    /**
+     * SET UP LIGHTING
+     */
+
+    // Vertex declarations.
+    PosColorTexCoord0Vertex::init();
+
+    LightProbe lightProbe;
+    lightProbe.load("./grace");
+
+    bgfx::UniformHandle u_mtx        = bgfx::createUniform("u_mtx",        bgfx::UniformType::Mat4);
+    bgfx::UniformHandle u_params     = bgfx::createUniform("u_params",     bgfx::UniformType::Vec4);
+    bgfx::UniformHandle u_flags      = bgfx::createUniform("u_flags",      bgfx::UniformType::Vec4);
+    bgfx::UniformHandle u_camPos     = bgfx::createUniform("u_camPos",     bgfx::UniformType::Vec4);
+    bgfx::UniformHandle s_texCube    = bgfx::createUniform("s_texCube",    bgfx::UniformType::Int1);
+    bgfx::UniformHandle s_texCubeIrr = bgfx::createUniform("s_texCubeIrr", bgfx::UniformType::Int1);
+
+    /**
+     * PER-FRAME SETTINGS
+     */
+
+    struct Settings
+    {
+        float m_speed;
+        float m_glossiness;
+        float m_exposure;
+        float m_diffspec;
+        float m_rgbDiff[3];
+        float m_rgbSpec[3];
+        bool m_diffuse;
+        bool m_specular;
+        bool m_diffuseIbl;
+        bool m_specularIbl;
+        bool m_showDiffColorWheel;
+        bool m_showSpecColorWheel;
+        ImguiCubemap::Enum m_crossCubemapPreview;
+    };
+
+    Settings settings;
+    settings.m_speed = 0.37f;
+    settings.m_exposure = 0.0f;
+    settings.m_diffuse = true;
+    settings.m_specular = true;
+    settings.m_diffuseIbl = true;
+    settings.m_specularIbl = true;
+    settings.m_showDiffColorWheel = true;
+    settings.m_showSpecColorWheel = false;
+    settings.m_crossCubemapPreview = ImguiCubemap::Cross;
+    
+    /* Steel */
+    settings.m_glossiness = 0.82f;
+    settings.m_diffspec   = 1.0f;
+    settings.m_rgbDiff[0] = 0.0f;
+    settings.m_rgbDiff[1] = 0.0f;
+    settings.m_rgbDiff[2] = 0.0f;
+    settings.m_rgbSpec[0] = 0.77f;
+    settings.m_rgbSpec[1] = 0.78f;
+    settings.m_rgbSpec[2] = 0.77f;
+
     float duration = 10.0f;
     int64_t last = 0;
     int balls = 5;
@@ -86,13 +173,17 @@ int _main_(int /* argc */, char** /* *argv[] */)
 
     Mesh * mesh = meshLoad("newton.bin");
 
-    bgfx::ShaderHandle vsh = bgfx::createShader(loadMem(entry::getFileReader(), "./vs_mesh.bin") );
-    bgfx::ShaderHandle fsh = bgfx::createShader(loadMem(entry::getFileReader(), "./fs_mesh.bin") );
-    bgfx::ProgramHandle program = bgfx::createProgram( vsh, fsh, true );
+    bgfx::ShaderHandle vsh = bgfx::createShader(loadMem(entry::getFileReader(), "./vs_ibl_mesh.bin") );
+    bgfx::ShaderHandle fsh = bgfx::createShader(loadMem(entry::getFileReader(), "./fs_ibl_mesh.bin") );
+    bgfx::ProgramHandle programMesh = bgfx::createProgram( vsh, fsh, true );
+    
+    vsh = bgfx::createShader(loadMem(entry::getFileReader(), "./vs_ibl_skybox.bin") );
+    fsh = bgfx::createShader(loadMem(entry::getFileReader(), "./fs_ibl_skybox.bin") );
+    bgfx::ProgramHandle programSky = bgfx::createProgram( vsh, fsh, true );
 
     Matrix4 view;
-    float eye[3] = { 0.0f, -1.0f, -2.5f };
-    float at[3]  = { 0.0f, -1.0f,  0.0f };
+    float eye[3] = { 0.0f, 0.0f, -3.0f };
+    float at[3]  = { 0.0f, 0.0f,  0.0f };
     bx::mtxLookAt((float *)&view, eye, at);
 
     Matrix4 proj;
@@ -103,12 +194,12 @@ int _main_(int /* argc */, char** /* *argv[] */)
     Matrix4 mtx;
     bx::mtxScale((float *)&mtx, 1.0f, 1.0f, 1.0f);
 
-    bgfx::UniformHandle u_time = bgfx::createUniform("u_time", bgfx::UniformType::Vec4);
-    float time = 0.0f;
-
     bx::mtxTranslate((float *)&mtx, -(n_worlds / float(2)), 0.0f, 0.0f);
     Matrix4 move;
-    bx::mtxTranslate((float *)&move, 1.0f, 0.0f, 0.0f);
+    bx::mtxTranslate((float *)&move, 0.8f, 0.0f, 0.0f);
+
+    float deg = 0.0f;
+    float time = 0.0f;
 
     while ( !entry::processEvents(width, height, debug, reset, &mouseState) )
     {
@@ -156,28 +247,90 @@ int _main_(int /* argc */, char** /* *argv[] */)
         imguiEndScrollArea();
         imguiEndFrame();
 
+        /* ibl settings */
+        s_uniforms.m_glossiness = settings.m_glossiness;
+        s_uniforms.m_exposure = settings.m_exposure;
+        s_uniforms.m_diffspec = settings.m_diffspec;
+        s_uniforms.m_flags[0] = float(settings.m_diffuse);
+        s_uniforms.m_flags[1] = float(settings.m_specular);
+        s_uniforms.m_flags[2] = float(settings.m_diffuseIbl);
+        s_uniforms.m_flags[3] = float(settings.m_specularIbl);
+        memcpy(s_uniforms.m_rgbDiff, settings.m_rgbDiff, 3*sizeof(float) );
+        memcpy(s_uniforms.m_rgbSpec, settings.m_rgbSpec, 3*sizeof(float) );
+
+        /* submit uniforms */
+        s_uniforms.submitPerFrameUniforms();
+
+        time += (float)(frameTime*settings.m_speed/freq);
+        s_uniforms.m_camPosTime[3] = time;
+
+        {
+            float view[16];
+            float proj[16];
+
+            bx::mtxIdentity(view);
+            bx::mtxOrtho(proj, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 100.0f);
+            bgfx::setViewTransform(0, view, proj);
+
+            bx::mtxLookAt(view, eye, at);
+            memcpy(s_uniforms.m_camPosTime, eye, 3*sizeof(float) );
+            bx::mtxProj(proj, 60.0f, float(width)/float(height), 0.1f, 100.0f);
+            bgfx::setViewTransform(1, view, proj);
+
+            bgfx::setViewRect(0, 0, 0, width, height);
+            bgfx::setViewRect(1, 0, 0, width, height);
+        }
+
+        // View 0.
+        bgfx::setTexture(0, s_texCube, lightProbe.m_tex);
+        bgfx::setState(BGFX_STATE_RGB_WRITE|BGFX_STATE_ALPHA_WRITE);
+        screenSpaceQuad( (float)width, (float)height, true);
+        s_uniforms.submitPerDrawUniforms();
+        bgfx::submit(0, programSky);
+
+        // // View 1.
+        // bx::mtxSRT((float *)&mtx
+        //         , 1.0f
+        //         , 1.0f
+        //         , 1.0f
+        //         , 0.0f
+        //         , bx::pi+time
+        //         , 0.0f
+        //         , 0.0f
+        //         , -1.0f
+        //         , 0.0f
+        //         );
+
+        bgfx::setTexture(0, s_texCube,    lightProbe.m_tex);
+        bgfx::setTexture(1, s_texCubeIrr, lightProbe.m_texIrr);
+        // meshSubmit(mesh, 1, programMesh, (float *)&mtx);
+
         /* Clear and print debug text */
         bgfx::dbgTextClear();
         bgfx::dbgTextPrintf(0, 1, 0x4f, "Cradle");
         bgfx::dbgTextPrintf(0, 2, 0x6f, "Newton's Cradle simulation.");
         bgfx::dbgTextPrintf(0, 3, 0x0f, "Frame: % 7.3f[ms]", double(frameTime)*toMs );
 
-        /* Set view 0 default viewport. */
-        bgfx::setViewRect(0, 0, 0, width, height);
-
-        // This dummy draw call is here to make sure that view 0 is cleared
-        // if no other draw calls are submitted to view 0.
-        // bgfx::touch(0);
-
-        bgfx::setUniform(u_time, &time);
-
         Matrix4 _mtx = mtx;
+        _mtx.a.x = 1.0f;
+        _mtx.b.y = 1.0f;
+        _mtx.c.z = 1.0f;
+        _mtx.d.w = 1.0f;
+
+        Matrix4 rot;
         for ( size_t i = 0; i < n_worlds; i++ )
         {
-            // meshSubmit(mesh, 0, program, worlds[i]);
             _mtx *= move;
-            meshSubmit(mesh, 0, program, (float *)&_mtx);
+
+            bx::mtxRotateZ((float *)&rot, deg);
+
+            Matrix4 s_mtx = _mtx;
+            s_mtx *= rot;
+            
+            meshSubmit(mesh, 1, programMesh, (float *)&s_mtx);
         }
+
+        deg += 0.01;
 
         /* advance to next frame (uses seperate thread) */
         bgfx::frame();
@@ -186,9 +339,16 @@ int _main_(int /* argc */, char** /* *argv[] */)
     meshUnload(mesh);
 
     // Cleanup.
-    bgfx::destroyProgram(program);
+    bgfx::destroyProgram(programMesh);
+    bgfx::destroyProgram(programSky);
 
-    bgfx::destroyUniform(u_time);
+    bgfx::destroyUniform(u_camPos);
+    bgfx::destroyUniform(u_flags);
+    bgfx::destroyUniform(u_params);
+    bgfx::destroyUniform(u_mtx);
+
+    bgfx::destroyUniform(s_texCube);
+    bgfx::destroyUniform(s_texCubeIrr);
 
     /* clean up */
     imguiDestroy();
