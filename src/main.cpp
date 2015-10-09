@@ -408,9 +408,9 @@ int _main_(int /* argc */, char** /* *argv[] */)
         {
             for ( size_t i = 0; i < bodies.size(); i++ )
             {
-                bodies[i].solve_constraint();
                 bodies[i].applyGravity();
-                bodies[i].update(time * toS, time / lastTime);
+                bodies[i].update(time, time / lastTime);
+                bodies[i].solve_constraint();
                 bodies[i].postsolve_constraint();
                 bodies[i].clearForces();
             }
