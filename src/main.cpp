@@ -66,6 +66,7 @@ std::vector<CollisionPair> pairs;
 void create_bodies(size_t n_bodies)
 {
     bodies = std::vector<PhysicsBody>(n_bodies);
+    pairs  = std::vector<CollisionPair>();
 
     n_worlds = n_bodies;
 
@@ -75,7 +76,7 @@ void create_bodies(size_t n_bodies)
         bodies[i].init_body(adjust,
                             10.0f, 
                             0.0f, 
-                            0.4f,
+                            0.2f,
                             2.25f
                         );
     }
@@ -122,6 +123,11 @@ void update_starting_degrees()
         {
             (*i).angle = -starting_degree;
         }
+    }
+
+    for ( std::vector<PhysicsBody>::iterator i = bodies.begin(); i != bodies.end(); i++ )
+    {
+        (*i).lastAngle = (*i).angle;
     }
 }
 
@@ -414,6 +420,52 @@ int _main_(int /* argc */, char** /* *argv[] */)
                 bodies[i].postsolve_constraint();
                 bodies[i].clearForces();
             }
+
+            std::vector<CollisionPair> active_collisions;
+            for ( size_t i = 0; i < pairs.size(); i++ )
+            {
+                CollisionPair pair = pairs[i];
+
+                if ( pairs[i].bodyA->collision.check_collision(pairs[i].bodyB->collision) )
+                {
+                    active_collisions.push_back(pairs[i]);
+
+                    Vector3 a_velocity = pair.bodyA->position - pair.bodyA->lastPosition;
+                    Vector3 b_velocity = pair.bodyB->position - pair.bodyB->lastPosition;
+
+                    if ( abs(vector3::distance(a_velocity)) > 0.00001f )
+                    {
+                        pair.bodyB->lastPosition = pair.bodyA->position;
+                        pair.bodyA->lastPosition = pair.bodyA->position;
+
+                        pair.bodyB->lastAngle -= pair.bodyA->angle - pair.bodyA->lastAngle;
+                        pair.bodyA->lastAngle = pair.bodyA->angle;
+                    }
+                    else
+                    {
+                        pair.bodyA->lastPosition = pair.bodyB->position;
+                        pair.bodyB->lastPosition = pair.bodyB->position;
+
+                        pair.bodyA->lastAngle -= pair.bodyB->angle - pair.bodyB->lastAngle;
+                        pair.bodyB->lastAngle = pair.bodyB->angle;
+                    }
+
+                    // pair.bodyA->lastPosition = pair.bodyB->position;
+                    // pair.bodyB->lastPosition = pair.bodyA->position;
+
+                    // pair.bodyA->lastAngle = pair.bodyB->angle;
+                    // pair.bodyB->lastAngle = pair.bodyA->angle;
+                }
+            }
+
+            // presolve_positions(active_collisions);
+            // for ( size_t times = 0; times < 3; times++ )
+            //     solve_positions(active_collisions);
+            // postsolve_positions(bodies);
+
+            // presolve_velocities(active_collisions);
+            // for ( size_t times = 0; times < 6; times++ )
+            //     solve_velocities(active_collisions);
         }
 
         Matrix4 rot;
@@ -428,8 +480,6 @@ int _main_(int /* argc */, char** /* *argv[] */)
             
             meshSubmit(mesh, 1, programMesh, (float *)&s_mtx);
         }
-
-        deg += 0.01;
 
         /* advance to next frame (uses seperate thread) */
         bgfx::frame();

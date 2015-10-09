@@ -25,15 +25,15 @@ struct BoundingSphere
         BoundingSphere s1 = *this;
 
         Vector3 pos = s1.origin - s2.origin;
-        float distance_sq = pos.x * pos.x + pos.y * pos.y;
+        float distance_sq = pos.x * pos.x; // + pos.y * pos.y;
         float min_dist_sq = s1.radius + s2.radius;
 
         return distance_sq <= (min_dist_sq * min_dist_sq);
     }
 
-    inline void update(Vector3& vel)
+    inline void update(Vector3 vel)
     {
-        origin += vel; 
+        origin -= vel;
     }
 };
 
@@ -52,7 +52,7 @@ struct PhysicsBody
     float speed;
     float mass;
 
-    const float inertia = 99999.0f;
+    const float inertia = 999.0f;
     const float restitution = 1.0f;
     const float friction = 0.0f;
     const float frictionAir = 0.001f;
@@ -92,7 +92,7 @@ struct PhysicsBody
         constraintLen = length;
 
         collision.origin = pos;
-        collision.origin.y -= length;
+        // collision.origin.y -= length;
         collision.radius = radius;
 
         position     =  lastPosition = collision.origin;
@@ -120,7 +120,8 @@ struct PhysicsBody
 
     inline void solve_constraint()
     {
-        float rot_angle = angle - constraintAngle;
+        float rot_angle = angle - constraintAngle - 180.0f;
+        rot_angle = ( rot_angle * M_PI ) / 180;
         Vector3 point_a = vector3::vector3(  position.x * cos(rot_angle) - position.y * sin(rot_angle),
                                     position.x * sin(rot_angle) + position.y * cos(rot_angle),
                                     0.0f 
@@ -178,6 +179,9 @@ struct PhysicsBody
         /* apply forces */
         position -= force;
         angle += torque;
+
+        /* update bounds */
+        collision.update(position - lastPosition);
     }
 
     inline void postsolve_constraint()
@@ -190,7 +194,7 @@ struct PhysicsBody
 
     inline void applyGravity()
     {
-        force.y += mass * 1.0f;
+        force.y -= mass * 100.0f;
     }
 
     /**
@@ -213,15 +217,15 @@ struct PhysicsBody
 
         /* Verlet integration for angular velocity */
         angularVelocity = ((angle - lastAngle) * frictionAir * correction) + (torque / inertia) * deltaTimeSq;
+        // if (angularVelocity < 0.1f && angularVelocity > -0.1f)
+        //     angularVelocity = 0.0f;
+
         lastAngle = angle;
         angle += angularVelocity;
 
         /* track speed and acceleration */
         speed = vector3::distance(velocity);
         angularSpeed = abs(angularVelocity);
-
-        /* update bounds */
-        collision.update(velocity);
     }
 
     inline void clearForces()

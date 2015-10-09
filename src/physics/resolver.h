@@ -44,6 +44,8 @@ inline void presolve_positions(std::vector<CollisionPair>& pairs)
         PhysicsBody * BodyA = pairs[i].bodyA;
         PhysicsBody * BodyB = pairs[i].bodyB;
 
+        pairs[i].collision.normal = vector3::vector3(1.0f, 0.0f, 0.0f);
+
         BodyA->total_contacts++;
         BodyB->total_contacts++;
     }
@@ -104,6 +106,8 @@ inline void postsolve_positions(std::vector<PhysicsBody>& bodies)
                 body.positionImpulse *= g_positionWarming;
             }
         }
+
+        body.total_contacts = 0;
     }
 }
 
